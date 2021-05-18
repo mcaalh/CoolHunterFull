@@ -1,9 +1,10 @@
 import { model, Schema } from 'mongoose'
+import crypto from 'crypto'
 
 import { Role, IUser } from './users.interface';
 
 // Schema
-const UserSchema: Schema<IUser> = new Schema({
+const userSchema: Schema<IUser> = new Schema({
   firstName: {
     type: String,
     required: true,
@@ -77,4 +78,37 @@ const UserSchema: Schema<IUser> = new Schema({
   }
 })
 
-export const User = model<IUser>("User", UserSchema)
+userSchema
+  .virtual('password')
+  .set(function(password) {
+    // create a temporary variable called _password
+    this._password = password;
+
+    //generate salt
+    this.salt = this.makeSalt()
+
+    //encryptPassword
+    this.passwordHash = this.encryptPassword(password)
+  })
+  .get(function() {
+    return this._password
+  })
+
+userSchema.methods = {
+  authenticate: function (plainText) {
+    return this.encryptPassword(plainText) === this.passwordHash
+  },
+  encryptPassword: function (password) {
+    if (!password) return ''
+    try {
+      return crypto.createHmac('sha1', this.salt).update(password).digest('hex')
+    } catch (error) {
+      return error();
+    }    
+  },
+  makeSalt: function () {
+    return Math.round(new Date().valueOf() * Math.random()) + '';
+  }
+}
+
+export const User = model<IUser>("User", userSchema)
