@@ -1,62 +1,70 @@
-import * as express from 'express'
-import * as morgan from 'morgan'
-import * as bodyParser from 'body-parser'
-import * as cookieParser from 'cookie-parser'
-import * as cors from 'cors'
-import * as mongoose from 'mongoose'
+import express from 'express'
+import morgan from 'morgan'
+import cookieParser from 'cookie-parser'
+import cors from 'cors'
+import mongoose from 'mongoose'
+import helmet from 'helmet'
 
 import { Settings } from '../settings';
-import blogRouter from './routes/blog';
-import db = require('./services/queries')
+import blogRouter from './blogs/blogs.router';
+import categoryRouter from './categories/categories.router';
+import authRouter from './auth/auth.router';
+
 require('dotenv').config()
 const api: string = Settings.API_URL
 
-//get app
+const port: number = Settings.PORT || 8000
+
 const app = express()
 
-//get the db
-mongoose.connect(Settings.DATABASE_LOCAL, {
-    useNewUrlParser: true,
-    useCreateIndex: true,
-    useFindAndModify: false,
-    useUnifiedTopology: true
-}).then(() => console.log('DB connected'));
+/** 
+ * App Configuration
+**/
 
-//middleware
 app.use(morgan('dev'))
 app.use(express.json())
 app.use(cookieParser())
+app.use(helmet())
+if (Settings.NODE_ENV === 'development') {
+    app.use(cors({
+        origin: `${Settings.CLIENT_URL}`
+    }));
+}
 
-// routes middleware
+app.options('*', cors())
+
+
+//connect to  the db
+mongoose.connect(Settings.DATABASE_CLOUD, {
+    useNewUrlParser: true,
+    useCreateIndex: true,
+    useFindAndModify: false,
+    useUnifiedTopology: true,
+    dbName: 'coolHunterDb'
+})
+    .then(() => console.log('DB connected'))
+    .catch((err) => {
+    console.log(`u've got error: ${err}`)
+});
+
+// routes
+
+//Auth
+app.use(api, authRouter)
+
+
+//Blogs
 app.use(api, blogRouter)
 
-//cors
-// if (Settings === 'development') {
-//     app.use(cors({
-//         origin: `${Settings.CLIENT_URL}`
-//     }));
-// }
+//Categories
+app.use(api, categoryRouter)
+//Users
 
-//routes http://localhost:3000/api/v1/products
+//Projects
 
-
-app.get(api + '/products', (req, res) => {
-    const product = {
-        id: 1,
-        name: 'Best Restaurant in town',
-        image: 'somess_url1'
-    }
-    res.send(product)
-})
-
-app.get(api + '/users', db.getUsers)
-app.get(api + '/users/:id', db.getUserById)
-app.post(api + '/users', db.createUser)
-app.put(api + '/users/:id', db.updateUser)
-app.delete(api + '/users/:id', db.deleteUser)
-
-//port
-const port:number = Settings.PORT || 8000
+/** 
+ * Server Activation
+ */
 
 app.listen(port, () => {
     console.log(`server is running on port ${port}`)
